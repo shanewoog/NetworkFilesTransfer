@@ -526,12 +526,6 @@ go test ./...
 go vet ./...
 ```
 
-## 开源建议
-
-- 不要把真实的 R2 密钥提交到仓库
-- 部署前确认 `config.json`、`version.txt`、`share.db` 是否需要纳入发布包
-- 如果启用 `r2_direct`，先在 Cloudflare R2 配好 bucket CORS
-
 ## License
 
 本项目使用 [MIT License](./LICENSE)。
