@@ -9,16 +9,20 @@
     <script src="./qrcode.min.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h1 class="text-2xl font-bold text-slate-800 mb-2 text-center">网络文件传输</h1>
-        <p class="text-slate-500 text-sm text-center mb-6">安全、快速、大文件传输</p>
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md language-card">
+        <div class="language-switch" aria-label="Language">
+            <button id="langZhBtn" type="button" class="lang-button" onclick="setLanguage('zh')">中文</button>
+            <button id="langEnBtn" type="button" class="lang-button" onclick="setLanguage('en')">EN</button>
+        </div>
+        <h1 id="pageTitle" class="text-2xl font-bold text-slate-800 mb-2 text-center">网络文件传输</h1>
+        <p id="pageSubtitle" class="text-slate-500 text-sm text-center mb-6">安全、快速、大文件传输</p>
 
         <div id="dropZone" class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-6">
             <div id="idleState">
-                <img src="/favicon.svg" alt="火箭图标" class="hero-icon">
-                <p class="text-slate-600">点击或拖拽文件</p>
+                <img id="uploadIcon" src="/favicon.svg" alt="火箭图标" class="hero-icon">
+                <p id="uploadPrompt" class="text-slate-600">点击或拖拽文件</p>
                 <p class="text-[10px] text-slate-400 mt-2">
-                    只支持最大 10GB 单文件上传
+                    <span id="singleSizeDisplay">只支持最大 10GB 单文件上传</span>
                     <br>
                     <span id="storageDisplay">整站可上传 20.0G</span>
                     <br>
@@ -39,21 +43,21 @@
         <input type="file" id="fileInput" class="hidden">
 
         <div id="resultArea" class="hidden border-t pt-6 text-center">
-            <p class="text-green-600 font-bold mb-2">上传成功</p>
+            <p id="successTitle" class="text-green-600 font-bold mb-2">上传成功</p>
             <div
                 id="shareLink"
                 class="bg-slate-100 p-3 rounded-lg break-all font-mono text-xs mb-4 cursor-pointer hover:bg-slate-200 transition-colors"
                 onclick="copyLink()"
                 title="点击复制"
             ></div>
-            <p class="text-[10px] text-slate-400">点击上方链接即可复制</p>
+            <p id="copyHint" class="text-[10px] text-slate-400">点击上方链接即可复制</p>
             <div class="mt-4 flex items-center justify-center gap-4">
                 <button
                     type="button"
                     onclick="shareResultLink()"
                     class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                    分享
+                    <span id="shareButtonText">分享</span>
                 </button>
                 <div class="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
                     <div id="qrCodeContainer" class="w-24 h-24 flex items-center justify-center overflow-hidden"></div>
@@ -66,8 +70,71 @@
 
     <script>
         const API_BASE = '/api';
+        const I18N = {
+            zh: {
+                htmlLang: 'zh-CN',
+                title: '网络文件传输',
+                subtitle: '安全、快速、大文件传输',
+                uploadIconAlt: '火箭图标',
+                uploadPrompt: '点击或拖拽文件',
+                singleSize: '只支持最大 10GB 单文件上传',
+                storage: (gb) => `整站还可上传 ${gb.toFixed(1)}G`,
+                storageDefault: '整站可上传 20.0G',
+                expire: (hours) => `上传文件最大有效期 ${hours} 小时`,
+                ready: '准备中...',
+                success: '上传成功',
+                copyTitle: '点击复制',
+                copyHint: '点击上方链接即可复制',
+                share: '分享',
+                version: (version) => `版本 ${version}`,
+                uploadFailed: '上传失败',
+                networkInterrupted: '网络连接中断',
+                partUploadFailed: '分片上传失败',
+                notEnoughSpace: (fileGB, availableGB) => `文件大小 (${fileGB.toFixed(2)}G) 超过可上传空间 (${availableGB.toFixed(1)}G)`,
+                uploadError: '上传出错',
+                uploading: (progress) => `正在上传: ${progress}%`,
+                packing: '正在打包链接...',
+                mergeFailed: '合并失败',
+                copied: '已成功复制到剪贴板',
+                shareCopied: '链接已复制，可直接分享',
+                qrUnavailable: '二维码不可用',
+                unknown: '未知',
+                shareMessage: (expireText) => `在浏览器打开，分享文件失效时间：${expireText}`
+            },
+            en: {
+                htmlLang: 'en',
+                title: 'Network File Transfer',
+                subtitle: 'Secure, fast, large-file transfer',
+                uploadIconAlt: 'Rocket icon',
+                uploadPrompt: 'Click or drag a file',
+                singleSize: 'Supports single-file uploads up to 10 GB',
+                storage: (gb) => `${gb.toFixed(1)}G available for this site`,
+                storageDefault: '20.0G available for this site',
+                expire: (hours) => `Uploaded files stay available for up to ${hours} hours`,
+                ready: 'Preparing...',
+                success: 'Upload complete',
+                copyTitle: 'Click to copy',
+                copyHint: 'Click the link above to copy it',
+                share: 'Share',
+                version: (version) => `Version ${version}`,
+                uploadFailed: 'Upload failed',
+                networkInterrupted: 'Network connection interrupted',
+                partUploadFailed: 'Chunk upload failed',
+                notEnoughSpace: (fileGB, availableGB) => `File size (${fileGB.toFixed(2)}G) exceeds available space (${availableGB.toFixed(1)}G)`,
+                uploadError: 'Upload error',
+                uploading: (progress) => `Uploading: ${progress}%`,
+                packing: 'Preparing share link...',
+                mergeFailed: 'Failed to finalize upload',
+                copied: 'Copied to clipboard',
+                shareCopied: 'Share text copied',
+                qrUnavailable: 'QR code unavailable',
+                unknown: 'Unknown',
+                shareMessage: (expireText) => `Open in browser. This shared file expires at: ${expireText}`
+            }
+        };
 
         let DOMAIN = window.location.origin;
+        let currentLang = getInitialLanguage();
         let isUploading = false;
         let currentUploadId = '';
         let isMerging = false;
@@ -100,6 +167,68 @@
         const qrCodeContainer = document.getElementById('qrCodeContainer');
         const versionDisplay = document.getElementById('versionDisplay');
 
+        function getInitialLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const queryLang = params.get('lang');
+            if (queryLang === 'en' || queryLang === 'zh') return queryLang;
+            const savedLang = localStorage.getItem('nft_lang');
+            if (savedLang === 'en' || savedLang === 'zh') return savedLang;
+            return 'zh';
+        }
+
+        function tr(key, ...args) {
+            const value = I18N[currentLang][key];
+            return typeof value === 'function' ? value(...args) : value;
+        }
+
+        function setLanguage(lang) {
+            if (lang !== 'zh' && lang !== 'en') return;
+            currentLang = lang;
+            localStorage.setItem('nft_lang', lang);
+            const url = new URL(window.location.href);
+            if (lang === 'en') {
+                url.searchParams.set('lang', 'en');
+            } else {
+                url.searchParams.delete('lang');
+            }
+            window.history.replaceState(null, '', url);
+            applyLanguage();
+        }
+
+        function localizeShareUrl(url) {
+            if (!url || currentLang !== 'en') return url;
+            const parsed = new URL(url, window.location.origin);
+            parsed.searchParams.set('lang', 'en');
+            return parsed.toString();
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = tr('htmlLang');
+            document.title = tr('title');
+            document.getElementById('pageTitle').innerText = tr('title');
+            document.getElementById('pageSubtitle').innerText = tr('subtitle');
+            document.getElementById('uploadIcon').alt = tr('uploadIconAlt');
+            document.getElementById('uploadPrompt').innerText = tr('uploadPrompt');
+            document.getElementById('singleSizeDisplay').innerText = tr('singleSize');
+            document.getElementById('successTitle').innerText = tr('success');
+            document.getElementById('shareLink').title = tr('copyTitle');
+            document.getElementById('copyHint').innerText = tr('copyHint');
+            document.getElementById('shareButtonText').innerText = tr('share');
+            document.getElementById('langZhBtn').classList.toggle('active', currentLang === 'zh');
+            document.getElementById('langEnBtn').classList.toggle('active', currentLang === 'en');
+            updateStorageDisplay();
+            updateExpireDisplay();
+            updateVersionDisplay();
+            if (statusText.innerText === I18N.zh.ready || statusText.innerText === I18N.en.ready) {
+                statusText.innerText = tr('ready');
+            }
+            if (currentShareUrl && !resultArea.classList.contains('hidden')) {
+                const localizedUrl = localizeShareUrl(currentShareUrl);
+                shareLink.innerText = localizedUrl;
+                renderQrCode(localizedUrl);
+            }
+        }
+
         async function fetchConfig() {
             try {
                 const resp = await fetch(`${API_BASE}/config`);
@@ -120,7 +249,7 @@
                     UPLOAD_MODE = data.upload_mode;
                 }
             } catch (e) {
-                console.warn('未获取到动态配置，使用默认值');
+                console.warn('Failed to load dynamic config, using defaults');
             }
 
             try {
@@ -131,27 +260,27 @@
                     updateStorageDisplay();
                 }
             } catch (e) {
-                console.warn('未获取到存储空间信息');
+                console.warn('Failed to load storage information');
             }
         }
 
         function updateExpireDisplay() {
             const expireEl = document.getElementById('expireDisplay');
             if (expireEl) {
-                expireEl.innerText = `上传文件最大有效期 ${EXPIRE_HOURS} 小时`;
+                expireEl.innerText = tr('expire', EXPIRE_HOURS);
             }
         }
 
         function updateStorageDisplay() {
             const storageEl = document.getElementById('storageDisplay');
             if (storageEl) {
-                storageEl.innerText = `整站还可上传 ${AVAILABLE_GB.toFixed(1)}G`;
+                storageEl.innerText = AVAILABLE_GB === 20 ? tr('storageDefault') : tr('storage', AVAILABLE_GB);
             }
         }
 
         function updateVersionDisplay() {
             if (versionDisplay) {
-                versionDisplay.innerText = `版本 ${APP_VERSION}`;
+                versionDisplay.innerText = tr('version', APP_VERSION);
             }
         }
 
@@ -196,10 +325,10 @@
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve(JSON.parse(xhr.responseText));
                     } else {
-                        reject(JSON.parse(xhr.responseText || '{"error":"上传失败"}'));
+                        reject(JSON.parse(xhr.responseText || JSON.stringify({ error: tr('uploadFailed') })));
                     }
                 };
-                xhr.onerror = () => reject({ error: '网络连接中断' });
+                xhr.onerror = () => reject({ error: tr('networkInterrupted') });
                 xhr.send(body);
             });
         }
@@ -221,10 +350,10 @@
                             etag: xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || ''
                         });
                     } else {
-                        reject({ error: '分片上传失败' });
+                        reject({ error: tr('partUploadFailed') });
                     }
                 };
-                xhr.onerror = () => reject({ error: '分片上传失败' });
+                xhr.onerror = () => reject({ error: tr('partUploadFailed') });
                 xhr.send(body);
             });
         }
@@ -234,7 +363,7 @@
 
             const fileSizeGB = file.size / 1024 / 1024 / 1024;
             if (fileSizeGB > AVAILABLE_GB) {
-                alert(`文件大小 (${fileSizeGB.toFixed(2)}G) 超过可上传空间 (${AVAILABLE_GB.toFixed(1)}G)`);
+                alert(tr('notEnoughSpace', fileSizeGB, AVAILABLE_GB));
                 return;
             }
 
@@ -275,7 +404,7 @@
                 await startLocalUpload(file, fileHash);
             } catch (err) {
                 if (!cancelNotified) {
-                    alert((err && err.error) || '上传出错');
+                    alert((err && err.error) || tr('uploadError'));
                 }
                 resetUI();
             }
@@ -305,7 +434,7 @@
                 const overallProgress = Math.min(99, Math.max(lastDisplayedProgress, Math.round((maxReportedBytes / file.size) * 100)));
                 lastDisplayedProgress = overallProgress;
                 progressBar.style.width = overallProgress + '%';
-                statusText.innerText = `正在上传: ${overallProgress}%`;
+                statusText.innerText = tr('uploading', overallProgress);
 
                 const elapsed = Math.max(0.001, (Date.now() - uploadStartedAt) / 1000);
                 const effectiveSpeed = (maxReportedBytes / (1024 * 1024) / elapsed).toFixed(2);
@@ -341,7 +470,7 @@
                         if (!uploadAborted) {
                             uploadAborted = true;
                             if (!cancelNotified) {
-                                alert((err && err.error) || '上传出错');
+                                alert((err && err.error) || tr('uploadError'));
                             }
                             resetUI();
                         }
@@ -357,7 +486,7 @@
             async function doMerge() {
                 if (uploadAborted) return;
                 isMerging = true;
-                statusText.innerText = '正在打包链接...';
+                statusText.innerText = tr('packing');
                 try {
                     const mergeResp = await fetch(`${API_BASE}/upload/merge`, {
                         method: 'POST',
@@ -377,7 +506,7 @@
                 } catch (err) {
                     uploadAborted = true;
                     if (!cancelNotified) {
-                        alert((err && err.error) || '合并失败');
+                        alert((err && err.error) || tr('mergeFailed'));
                     }
                     resetUI();
                 }
@@ -424,7 +553,7 @@
                 const overallProgress = Math.min(99, Math.max(lastDisplayedProgress, Math.round((maxReportedBytes / file.size) * 100)));
                 lastDisplayedProgress = overallProgress;
                 progressBar.style.width = overallProgress + '%';
-                statusText.innerText = `正在上传: ${overallProgress}%`;
+                statusText.innerText = tr('uploading', overallProgress);
 
                 const elapsed = Math.max(0.001, (Date.now() - uploadStartedAt) / 1000);
                 const effectiveSpeed = (maxReportedBytes / (1024 * 1024) / elapsed).toFixed(2);
@@ -478,7 +607,7 @@
                         if (!uploadAborted) {
                             uploadAborted = true;
                             if (!cancelNotified) {
-                                alert((err && err.error) || '上传出错');
+                                alert((err && err.error) || tr('uploadError'));
                             }
                             resetUI();
                         }
@@ -494,7 +623,7 @@
             async function doComplete() {
                 if (uploadAborted) return;
                 isMerging = true;
-                statusText.innerText = '正在打包链接...';
+                statusText.innerText = tr('packing');
                 try {
                     completedParts.sort((a, b) => a.part_number - b.part_number);
                     const completeResp = await fetch(`${API_BASE}/r2/upload/complete`, {
@@ -513,7 +642,7 @@
                 } catch (err) {
                     uploadAborted = true;
                     if (!cancelNotified) {
-                        alert((err && err.error) || '合并失败');
+                        alert((err && err.error) || tr('mergeFailed'));
                     }
                     resetUI();
                 }
@@ -533,8 +662,8 @@
             uploadingState.classList.add('hidden');
             idleState.classList.remove('hidden');
             resultArea.classList.remove('hidden');
-            shareLink.innerText = url;
-            renderQrCode(url);
+            shareLink.innerText = localizeShareUrl(url);
+            renderQrCode(localizeShareUrl(url));
             try {
                 const stResp = await fetch(`${API_BASE}/storage`);
                 const stData = await stResp.json();
@@ -556,7 +685,7 @@
             uploadingState.classList.add('hidden');
             idleState.classList.remove('hidden');
             progressBar.style.width = '0%';
-            statusText.innerText = '准备中...';
+            statusText.innerText = tr('ready');
             speedText.innerText = '0 MB/s';
             fileInput.value = '';
             currentShareUrl = '';
@@ -567,7 +696,7 @@
         function copyLink() {
             navigator.clipboard.writeText(shareLink.innerText);
             const originalText = shareLink.innerText;
-            shareLink.innerText = '已成功复制到剪贴板';
+            shareLink.innerText = tr('copied');
             shareLink.classList.replace('bg-slate-100', 'bg-green-100');
             setTimeout(() => {
                 shareLink.innerText = originalText;
@@ -578,7 +707,7 @@
         function copyLinkSilently(url) {
             navigator.clipboard.writeText(url);
             const originalText = shareLink.innerText;
-            shareLink.innerText = '链接已复制，可直接分享';
+            shareLink.innerText = tr('shareCopied');
             shareLink.classList.replace('bg-slate-100', 'bg-green-100');
             setTimeout(() => {
                 shareLink.innerText = originalText;
@@ -599,7 +728,7 @@
             if (!qrCodeContainer || !url) return;
 
             if (typeof QRCode === 'undefined') {
-                qrCodeContainer.innerHTML = '<span class="text-[10px] text-slate-400">二维码不可用</span>';
+                qrCodeContainer.innerHTML = `<span class="text-[10px] text-slate-400">${tr('qrUnavailable')}</span>`;
                 return;
             }
 
@@ -614,16 +743,17 @@
         }
 
         function formatExpireAt(expireAt) {
-            if (!expireAt) return '未知';
+            if (!expireAt) return tr('unknown');
             const d = new Date(expireAt * 1000);
             const pad = (n) => String(n).padStart(2, '0');
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
         function buildShareMessage() {
-            const url = currentShareUrl || shareLink.innerText.trim();
+            const url = new URL(localizeShareUrl(currentShareUrl || shareLink.innerText.trim()), window.location.origin);
             const expireText = formatExpireAt(currentShareExpireAt);
-            return `${url}?s=在浏览器打开，分享文件失效时间：${expireText}`;
+            url.searchParams.set('s', tr('shareMessage', expireText));
+            return url.toString();
         }
 
         function copyShareMessage() {
@@ -681,6 +811,7 @@
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
         window.addEventListener('pagehide', notifyCancelUpload);
         window.addEventListener('beforeunload', notifyCancelUpload);
+        applyLanguage();
         fetchConfig();
     </script>
 </body>

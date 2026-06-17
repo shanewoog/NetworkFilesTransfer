@@ -341,3 +341,37 @@ body {
     overflow-wrap: anywhere;
     word-break: break-word;
 }
+
+.language-card {
+    position: relative;
+}
+
+.language-switch {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: inline-flex;
+    gap: 0.25rem;
+    padding: 0.125rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #ffffff;
+}
+
+.lang-button {
+    min-width: 2.25rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    cursor: pointer;
+}
+
+.lang-button.active {
+    background: #2563eb;
+    color: #ffffff;
+}

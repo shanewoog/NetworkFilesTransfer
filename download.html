@@ -8,11 +8,15 @@
     <link rel="stylesheet" href="./app.css">
 </head>
 <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        <h1 class="text-2xl font-bold text-slate-800 mb-2 text-center">文件下载</h1>
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md language-card">
+        <div class="language-switch" aria-label="Language">
+            <button id="langZhBtn" type="button" class="lang-button" onclick="setLanguage('zh')">中文</button>
+            <button id="langEnBtn" type="button" class="lang-button" onclick="setLanguage('en')">EN</button>
+        </div>
+        <h1 id="pageTitle" class="text-2xl font-bold text-slate-800 mb-2 text-center">文件下载</h1>
 
         <div class="text-center mb-6">
-            <img src="/favicon.svg" alt="下载图标" class="hero-icon mx-auto mb-4">
+            <img id="downloadIcon" src="/favicon.svg" alt="下载图标" class="hero-icon mx-auto mb-4">
             <h2 id="fileName" class="text-lg font-medium text-slate-700 mb-2 file-name-display">加载中...</h2>
             <p id="fileSize" class="text-slate-500 text-sm mb-2">-</p>
             <p id="expireInfo" class="text-slate-400 text-xs mb-2">-</p>
@@ -24,27 +28,116 @@
             id="downloadBtn"
             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-            开始下载
+            <span id="downloadBtnText">开始下载</span>
         </button>
 
         <div class="mt-4 text-center">
-            <a href="/" class="text-sm text-blue-600">我也要上传</a>
+            <a id="uploadLink" href="/" class="text-sm text-blue-600">我也要上传</a>
         </div>
     </div>
 
     <script>
         const API_BASE = '';
         const code = location.pathname.replace(/^\//, '');
+        const I18N = {
+            zh: {
+                htmlLang: 'zh-CN',
+                title: '文件下载',
+                downloadIconAlt: '下载图标',
+                loading: '加载中...',
+                downloadCount: (done, remain) => `已下载 ${done} 次，剩余 ${remain} 次`,
+                download: '开始下载',
+                upload: '我也要上传',
+                missing: '文件不存在或已过期',
+                unavailable: '无法下载',
+                validFor: (text) => `有效期 ${text}`,
+                expiresAt: (text) => `过期时间 ${text}`,
+                limitUsed: '下载次数已用完',
+                fetching: '正在获取...',
+                fetchFailed: '获取失败',
+                downloadFailed: '下载失败',
+                seconds: (n) => `${n} 秒`,
+                minutes: (n) => `${n} 分钟`,
+                hours: (n) => `${n} 小时`,
+                days: (n) => `${n} 天`
+            },
+            en: {
+                htmlLang: 'en',
+                title: 'File Download',
+                downloadIconAlt: 'Download icon',
+                loading: 'Loading...',
+                downloadCount: (done, remain) => `Downloaded ${done} times, ${remain} remaining`,
+                download: 'Start download',
+                upload: 'Upload a file',
+                missing: 'File not found or expired',
+                unavailable: 'Unavailable',
+                validFor: (text) => `Valid for ${text}`,
+                expiresAt: (text) => `Expires at ${text}`,
+                limitUsed: 'Download limit reached',
+                fetching: 'Getting link...',
+                fetchFailed: 'Failed to get link',
+                downloadFailed: 'Download failed',
+                seconds: (n) => `${n} sec`,
+                minutes: (n) => `${n} min`,
+                hours: (n) => `${n} hr`,
+                days: (n) => `${n} day${n === 1 ? '' : 's'}`
+            }
+        };
+        let currentLang = getInitialLanguage();
+
+        function getInitialLanguage() {
+            const params = new URLSearchParams(window.location.search);
+            const queryLang = params.get('lang');
+            if (queryLang === 'en' || queryLang === 'zh') return queryLang;
+            const savedLang = localStorage.getItem('nft_lang');
+            if (savedLang === 'en' || savedLang === 'zh') return savedLang;
+            return 'zh';
+        }
+
+        function tr(key, ...args) {
+            const value = I18N[currentLang][key];
+            return typeof value === 'function' ? value(...args) : value;
+        }
+
+        function setLanguage(lang) {
+            if (lang !== 'zh' && lang !== 'en') return;
+            currentLang = lang;
+            localStorage.setItem('nft_lang', lang);
+            const url = new URL(window.location.href);
+            if (lang === 'en') {
+                url.searchParams.set('lang', 'en');
+            } else {
+                url.searchParams.delete('lang');
+            }
+            window.history.replaceState(null, '', url);
+            applyLanguage();
+            loadFileInfo();
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = tr('htmlLang');
+            document.title = tr('title');
+            document.getElementById('pageTitle').innerText = tr('title');
+            document.getElementById('downloadIcon').alt = tr('downloadIconAlt');
+            document.getElementById('uploadLink').innerText = tr('upload');
+            document.getElementById('uploadLink').href = currentLang === 'en' ? '/?lang=en' : '/';
+            document.getElementById('langZhBtn').classList.toggle('active', currentLang === 'zh');
+            document.getElementById('langEnBtn').classList.toggle('active', currentLang === 'en');
+            document.getElementById('downloadBtnText').innerText = tr('download');
+            if (document.getElementById('fileName').innerText === I18N.zh.loading || document.getElementById('fileName').innerText === I18N.en.loading) {
+                document.getElementById('fileName').innerText = tr('loading');
+            }
+        }
 
         async function loadFileInfo() {
             const res = await fetch(`${API_BASE}/api/file/${code}`);
             const data = await res.json();
 
             if (data.error || !res.ok) {
-                document.getElementById('fileName').innerText = '文件不存在或已过期';
+                document.getElementById('fileName').innerText = tr('missing');
                 document.getElementById('fileName').classList.add('text-red-500');
                 document.getElementById('downloadBtn').disabled = true;
-                document.getElementById('downloadBtn').innerText = '无法下载';
+                document.getElementById('downloadBtnText').innerText = tr('unavailable');
                 return;
             }
 
@@ -53,29 +146,29 @@
 
             const now = Math.floor(Date.now() / 1000);
             const left = Math.max(0, data.expire_at - now);
-            document.getElementById('expireInfo').innerText = `有效期 ${formatTime(left)}`;
-            document.getElementById('expireAtInfo').innerText = `过期时间 ${formatDateTime(data.expire_at)}`;
+            document.getElementById('expireInfo').innerText = tr('validFor', formatTime(left));
+            document.getElementById('expireAtInfo').innerText = tr('expiresAt', formatDateTime(data.expire_at));
 
             const remain = data.download_limit - data.download_count;
-            document.getElementById('downloadCount').innerText = `已下载 ${data.download_count} 次，剩余 ${remain} 次`;
+            document.getElementById('downloadCount').innerText = tr('downloadCount', data.download_count, remain);
             document.getElementById('downloadCount').classList.remove('hidden');
 
             if (remain <= 0) {
                 document.getElementById('downloadBtn').disabled = true;
-                document.getElementById('downloadBtn').innerText = '下载次数已用完';
+                document.getElementById('downloadBtnText').innerText = tr('limitUsed');
             }
 
             document.getElementById('downloadBtn').onclick = async () => {
                 const btn = document.getElementById('downloadBtn');
                 btn.disabled = true;
-                btn.innerText = '正在获取...';
+                document.getElementById('downloadBtnText').innerText = tr('fetching');
 
                 try {
                     const downloadRes = await fetch(`${API_BASE}/api/download/${code}`);
                     const d = await downloadRes.json();
 
                     if (!downloadRes.ok) {
-                        alert(d.error || '获取失败');
+                        alert(d.error || tr('fetchFailed'));
                         location.reload();
                         return;
                     }
@@ -92,10 +185,10 @@
                         window.location.href = d.url;
                     }
 
-                    btn.innerText = '开始下载';
+                    document.getElementById('downloadBtnText').innerText = tr('download');
                     setTimeout(() => location.reload(), 2000);
                 } catch (e) {
-                    alert('下载失败');
+                    alert(tr('downloadFailed'));
                     location.reload();
                 }
             };
@@ -112,10 +205,10 @@
         }
 
         function formatTime(seconds) {
-            if (seconds < 60) return `${seconds} 秒`;
-            if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`;
-            if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时`;
-            return `${Math.floor(seconds / 86400)} 天`;
+            if (seconds < 60) return tr('seconds', seconds);
+            if (seconds < 3600) return tr('minutes', Math.floor(seconds / 60));
+            if (seconds < 86400) return tr('hours', Math.floor(seconds / 3600));
+            return tr('days', Math.floor(seconds / 86400));
         }
 
         function formatDateTime(timestamp) {
@@ -124,6 +217,7 @@
             return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }
 
+        applyLanguage();
         loadFileInfo();
     </script>
 </body>
