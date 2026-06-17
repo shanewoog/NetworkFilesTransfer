@@ -86,9 +86,6 @@
         let currentLang = getInitialLanguage();
 
         function getInitialLanguage() {
-            const params = new URLSearchParams(window.location.search);
-            const queryLang = params.get('lang');
-            if (queryLang === 'en' || queryLang === 'zh') return queryLang;
             const savedLang = localStorage.getItem('nft_lang');
             if (savedLang === 'en' || savedLang === 'zh') return savedLang;
             return 'zh';
@@ -103,13 +100,6 @@
             if (lang !== 'zh' && lang !== 'en') return;
             currentLang = lang;
             localStorage.setItem('nft_lang', lang);
-            const url = new URL(window.location.href);
-            if (lang === 'en') {
-                url.searchParams.set('lang', 'en');
-            } else {
-                url.searchParams.delete('lang');
-            }
-            window.history.replaceState(null, '', url);
             applyLanguage();
             loadFileInfo();
         }
@@ -120,7 +110,7 @@
             document.getElementById('pageTitle').innerText = tr('title');
             document.getElementById('downloadIcon').alt = tr('downloadIconAlt');
             document.getElementById('uploadLink').innerText = tr('upload');
-            document.getElementById('uploadLink').href = currentLang === 'en' ? '/?lang=en' : '/';
+            document.getElementById('uploadLink').href = '/';
             document.getElementById('langZhBtn').classList.toggle('active', currentLang === 'zh');
             document.getElementById('langEnBtn').classList.toggle('active', currentLang === 'en');
             document.getElementById('downloadBtnText').innerText = tr('download');

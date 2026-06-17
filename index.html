@@ -168,9 +168,6 @@
         const versionDisplay = document.getElementById('versionDisplay');
 
         function getInitialLanguage() {
-            const params = new URLSearchParams(window.location.search);
-            const queryLang = params.get('lang');
-            if (queryLang === 'en' || queryLang === 'zh') return queryLang;
             const savedLang = localStorage.getItem('nft_lang');
             if (savedLang === 'en' || savedLang === 'zh') return savedLang;
             return 'zh';
@@ -185,21 +182,7 @@
             if (lang !== 'zh' && lang !== 'en') return;
             currentLang = lang;
             localStorage.setItem('nft_lang', lang);
-            const url = new URL(window.location.href);
-            if (lang === 'en') {
-                url.searchParams.set('lang', 'en');
-            } else {
-                url.searchParams.delete('lang');
-            }
-            window.history.replaceState(null, '', url);
             applyLanguage();
-        }
-
-        function localizeShareUrl(url) {
-            if (!url || currentLang !== 'en') return url;
-            const parsed = new URL(url, window.location.origin);
-            parsed.searchParams.set('lang', 'en');
-            return parsed.toString();
         }
 
         function applyLanguage() {
@@ -223,9 +206,8 @@
                 statusText.innerText = tr('ready');
             }
             if (currentShareUrl && !resultArea.classList.contains('hidden')) {
-                const localizedUrl = localizeShareUrl(currentShareUrl);
-                shareLink.innerText = localizedUrl;
-                renderQrCode(localizedUrl);
+                shareLink.innerText = currentShareUrl;
+                renderQrCode(currentShareUrl);
             }
         }
 
@@ -662,8 +644,8 @@
             uploadingState.classList.add('hidden');
             idleState.classList.remove('hidden');
             resultArea.classList.remove('hidden');
-            shareLink.innerText = localizeShareUrl(url);
-            renderQrCode(localizeShareUrl(url));
+            shareLink.innerText = url;
+            renderQrCode(url);
             try {
                 const stResp = await fetch(`${API_BASE}/storage`);
                 const stData = await stResp.json();
@@ -750,7 +732,7 @@
         }
 
         function buildShareMessage() {
-            const url = new URL(localizeShareUrl(currentShareUrl || shareLink.innerText.trim()), window.location.origin);
+            const url = new URL(currentShareUrl || shareLink.innerText.trim(), window.location.origin);
             const expireText = formatExpireAt(currentShareExpireAt);
             url.searchParams.set('s', tr('shareMessage', expireText));
             return url.toString();
