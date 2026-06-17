@@ -6,7 +6,7 @@
 
 测试地址：[https://5u.fit](https://5u.fit/)（已启用 Cloudflare R2）
 
-![NetworkFilesTransfer 产品截图](./docs/product-screenshot.png)
+![NetworkFilesTransfer 产品截图](./docs/product-screenshot-zh.png)
 
 它提供了开箱即用的上传页和下载页，支持：
 
