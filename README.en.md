@@ -6,6 +6,8 @@
 
 Demo: [https://5u.fit](https://5u.fit/) (Cloudflare R2 enabled)
 
+![NetworkFilesTransfer product screenshot](./docs/product-screenshot.png)
+
 It provides ready-to-use upload and download pages for temporary file sharing, LAN transfers, and small-team file delivery.
 
 ## Features
