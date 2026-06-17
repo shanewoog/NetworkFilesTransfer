@@ -2,6 +2,8 @@
 
 `NetworkFilesTransfer` 是一个基于 Go、Gin 和 SQLite 的轻量文件传输服务。
 
+测试地址：https://5u.fit
+
 它提供了开箱即用的上传页和下载页，支持：
 
 - 大文件分片上传
