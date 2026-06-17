@@ -1,0 +1,687 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络文件传输</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="./app.css">
+    <script src="./qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <h1 class="text-2xl font-bold text-slate-800 mb-2 text-center">网络文件传输</h1>
+        <p class="text-slate-500 text-sm text-center mb-6">安全、快速、大文件传输</p>
+
+        <div id="dropZone" class="drop-zone rounded-xl p-10 text-center cursor-pointer mb-6">
+            <div id="idleState">
+                <img src="/favicon.svg" alt="火箭图标" class="hero-icon">
+                <p class="text-slate-600">点击或拖拽文件</p>
+                <p class="text-[10px] text-slate-400 mt-2">
+                    只支持最大 10GB 单文件上传
+                    <br>
+                    <span id="storageDisplay">整站可上传 20.0G</span>
+                    <br>
+                    <span id="expireDisplay">上传文件最大有效期 24 小时</span>
+                </p>
+            </div>
+            <div id="uploadingState" class="hidden text-left">
+                <p id="fileName" class="font-medium truncate text-slate-700 mb-2"></p>
+                <div class="w-full bg-slate-200 rounded-full h-2 mb-2">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500">
+                    <span id="statusText">准备中...</span>
+                    <span id="speedText" class="font-mono font-bold text-blue-600">0 MB/s</span>
+                </div>
+            </div>
+        </div>
+        <input type="file" id="fileInput" class="hidden">
+
+        <div id="resultArea" class="hidden border-t pt-6 text-center">
+            <p class="text-green-600 font-bold mb-2">上传成功</p>
+            <div
+                id="shareLink"
+                class="bg-slate-100 p-3 rounded-lg break-all font-mono text-xs mb-4 cursor-pointer hover:bg-slate-200 transition-colors"
+                onclick="copyLink()"
+                title="点击复制"
+            ></div>
+            <p class="text-[10px] text-slate-400">点击上方链接即可复制</p>
+            <div class="mt-4 flex items-center justify-center gap-4">
+                <button
+                    type="button"
+                    onclick="shareResultLink()"
+                    class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                    分享
+                </button>
+                <div class="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+                    <div id="qrCodeContainer" class="w-24 h-24 flex items-center justify-center overflow-hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <p id="versionDisplay" class="text-[10px] text-slate-400 text-center mt-6">版本 1.0.0</p>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        let DOMAIN = window.location.origin;
+        let isUploading = false;
+        let currentUploadId = '';
+        let isMerging = false;
+        let isCompleted = false;
+        let cancelNotified = false;
+        let currentShareUrl = '';
+        let currentShareExpireAt = 0;
+        let UPLOAD_MODE = 'local';
+        let activeUploadMode = 'local';
+        let EXPIRE_HOURS = 24;
+        let AVAILABLE_GB = 20;
+        let APP_VERSION = '1.0.0';
+
+        function getUploadConfig(fileSize) {
+            if (fileSize < 200 * 1024 * 1024) return { chunkSize: 2 * 1024 * 1024, parallel: 1 };
+            if (fileSize < 1 * 1024 * 1024 * 1024) return { chunkSize: 5 * 1024 * 1024, parallel: 2 };
+            if (fileSize < 5 * 1024 * 1024 * 1024) return { chunkSize: 10 * 1024 * 1024, parallel: 3 };
+            return { chunkSize: 20 * 1024 * 1024, parallel: 3 };
+        }
+
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const idleState = document.getElementById('idleState');
+        const uploadingState = document.getElementById('uploadingState');
+        const progressBar = document.getElementById('progressBar');
+        const statusText = document.getElementById('statusText');
+        const speedText = document.getElementById('speedText');
+        const resultArea = document.getElementById('resultArea');
+        const shareLink = document.getElementById('shareLink');
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+        const versionDisplay = document.getElementById('versionDisplay');
+
+        async function fetchConfig() {
+            try {
+                const resp = await fetch(`${API_BASE}/config`);
+                const data = await resp.json();
+
+                if (data.domain) {
+                    DOMAIN = data.domain.replace(/\/$/, '');
+                }
+                if (data.expire_hours) {
+                    EXPIRE_HOURS = data.expire_hours;
+                    updateExpireDisplay();
+                }
+                if (data.version) {
+                    APP_VERSION = data.version;
+                    updateVersionDisplay();
+                }
+                if (data.upload_mode) {
+                    UPLOAD_MODE = data.upload_mode;
+                }
+            } catch (e) {
+                console.warn('未获取到动态配置，使用默认值');
+            }
+
+            try {
+                const stResp = await fetch(`${API_BASE}/storage`);
+                const stData = await stResp.json();
+                if (stData.available_gb !== undefined) {
+                    AVAILABLE_GB = stData.available_gb;
+                    updateStorageDisplay();
+                }
+            } catch (e) {
+                console.warn('未获取到存储空间信息');
+            }
+        }
+
+        function updateExpireDisplay() {
+            const expireEl = document.getElementById('expireDisplay');
+            if (expireEl) {
+                expireEl.innerText = `上传文件最大有效期 ${EXPIRE_HOURS} 小时`;
+            }
+        }
+
+        function updateStorageDisplay() {
+            const storageEl = document.getElementById('storageDisplay');
+            if (storageEl) {
+                storageEl.innerText = `整站还可上传 ${AVAILABLE_GB.toFixed(1)}G`;
+            }
+        }
+
+        function updateVersionDisplay() {
+            if (versionDisplay) {
+                versionDisplay.innerText = `版本 ${APP_VERSION}`;
+            }
+        }
+
+        function notifyCancelUpload() {
+            if (!isUploading || isMerging || isCompleted || !currentUploadId || cancelNotified) {
+                return;
+            }
+
+            cancelNotified = true;
+            const isDirectUpload = activeUploadMode === 'r2_direct';
+            const payload = JSON.stringify(isDirectUpload ? { session_id: currentUploadId } : { upload_id: currentUploadId });
+            const cancelUrl = isDirectUpload ? `${API_BASE}/r2/upload/cancel` : `${API_BASE}/upload/cancel`;
+
+            if (navigator.sendBeacon) {
+                const ok = navigator.sendBeacon(cancelUrl, new Blob([payload], { type: 'application/json' }));
+                if (ok) {
+                    return;
+                }
+            }
+
+            fetch(cancelUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                keepalive: true
+            }).catch(() => {});
+        }
+
+        function uploadWithProgress(url, body, onProgress, headers = {}) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url);
+                xhr.withCredentials = false;
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                for (const key in headers) {
+                    xhr.setRequestHeader(key, headers[key]);
+                }
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) onProgress(e.loaded);
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(JSON.parse(xhr.responseText));
+                    } else {
+                        reject(JSON.parse(xhr.responseText || '{"error":"上传失败"}'));
+                    }
+                };
+                xhr.onerror = () => reject({ error: '网络连接中断' });
+                xhr.send(body);
+            });
+        }
+
+        function putWithProgress(url, body, onProgress, headers = {}) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', url);
+                xhr.withCredentials = false;
+                for (const key in headers) {
+                    xhr.setRequestHeader(key, headers[key]);
+                }
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) onProgress(e.loaded);
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve({
+                            etag: xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || ''
+                        });
+                    } else {
+                        reject({ error: '分片上传失败' });
+                    }
+                };
+                xhr.onerror = () => reject({ error: '分片上传失败' });
+                xhr.send(body);
+            });
+        }
+
+        async function handleFile(file) {
+            if (!file || isUploading) return;
+
+            const fileSizeGB = file.size / 1024 / 1024 / 1024;
+            if (fileSizeGB > AVAILABLE_GB) {
+                alert(`文件大小 (${fileSizeGB.toFixed(2)}G) 超过可上传空间 (${AVAILABLE_GB.toFixed(1)}G)`);
+                return;
+            }
+
+            activeUploadMode = UPLOAD_MODE || 'local';
+            isUploading = true;
+            isMerging = false;
+            isCompleted = false;
+            cancelNotified = false;
+            currentUploadId = '';
+            idleState.classList.add('hidden');
+            uploadingState.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+            document.getElementById('fileName').innerText = file.name;
+
+            try {
+                const buffer = await file.slice(0, 10 * 1024 * 1024).arrayBuffer();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+                const fileHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+                try {
+                    const checkResp = await fetch(`${API_BASE}/upload/check`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ hash: fileHash })
+                    });
+                    const checkRes = await checkResp.json();
+                    if (checkRes.hit) {
+                        await showResult(DOMAIN + '/' + checkRes.url.split('/').pop(), checkRes.expire_at || 0);
+                        return;
+                    }
+                } catch (e) {}
+
+                if (activeUploadMode === 'r2_direct') {
+                    await startR2DirectUpload(file, fileHash);
+                    return;
+                }
+
+                await startLocalUpload(file, fileHash);
+            } catch (err) {
+                if (!cancelNotified) {
+                    alert((err && err.error) || '上传出错');
+                }
+                resetUI();
+            }
+        }
+
+        async function startLocalUpload(file, fileHash) {
+            const config = getUploadConfig(file.size);
+            const chunkSize = config.chunkSize;
+            const parallel = config.parallel;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            const uploadId = crypto.randomUUID();
+            currentUploadId = uploadId;
+            const uploadStartedAt = Date.now();
+
+            let uploadedBytes = 0;
+            let uploading = new Set();
+            let activeChunkLoaded = new Map();
+            let nextIndex = 0;
+            let uploadAborted = false;
+            let maxReportedBytes = 0;
+            let lastDisplayedProgress = 0;
+
+            function updateUploadMetrics() {
+                const inflightBytes = Array.from(activeChunkLoaded.values()).reduce((sum, value) => sum + value, 0);
+                const totalUploaded = Math.min(file.size, uploadedBytes + inflightBytes);
+                maxReportedBytes = Math.max(maxReportedBytes, totalUploaded);
+                const overallProgress = Math.min(99, Math.max(lastDisplayedProgress, Math.round((maxReportedBytes / file.size) * 100)));
+                lastDisplayedProgress = overallProgress;
+                progressBar.style.width = overallProgress + '%';
+                statusText.innerText = `正在上传: ${overallProgress}%`;
+
+                const elapsed = Math.max(0.001, (Date.now() - uploadStartedAt) / 1000);
+                const effectiveSpeed = (maxReportedBytes / (1024 * 1024) / elapsed).toFixed(2);
+                speedText.innerText = `${effectiveSpeed} MB/s`;
+            }
+
+            async function uploadChunk(index) {
+                const start = index * chunkSize;
+                const end = Math.min(file.size, start + chunkSize);
+                const chunk = file.slice(start, end);
+                activeChunkLoaded.set(index, 0);
+                try {
+                    await uploadWithProgress(`${API_BASE}/upload/chunk`, chunk, (loaded) => {
+                        activeChunkLoaded.set(index, loaded);
+                        updateUploadMetrics();
+                    }, { 'X-Upload-ID': uploadId, 'X-Index': index });
+                    uploadedBytes += (end - start);
+                    updateUploadMetrics();
+                } finally {
+                    activeChunkLoaded.delete(index);
+                    uploading.delete(index);
+                    uploadNext();
+                }
+            }
+
+            function uploadNext() {
+                if (uploadAborted) return;
+
+                while (uploading.size < parallel && nextIndex < totalChunks) {
+                    const chunkIndex = nextIndex;
+                    uploading.add(chunkIndex);
+                    uploadChunk(chunkIndex).catch((err) => {
+                        if (!uploadAborted) {
+                            uploadAborted = true;
+                            if (!cancelNotified) {
+                                alert((err && err.error) || '上传出错');
+                            }
+                            resetUI();
+                        }
+                    });
+                    nextIndex++;
+                }
+
+                if (uploading.size === 0 && nextIndex >= totalChunks && !uploadAborted) {
+                    doMerge();
+                }
+            }
+
+            async function doMerge() {
+                if (uploadAborted) return;
+                isMerging = true;
+                statusText.innerText = '正在打包链接...';
+                try {
+                    const mergeResp = await fetch(`${API_BASE}/upload/merge`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            upload_id: uploadId,
+                            file_name: file.name,
+                            total: totalChunks,
+                            hash: fileHash
+                        })
+                    });
+                    const mergeRes = await mergeResp.json();
+                    if (!mergeResp.ok) {
+                        throw mergeRes;
+                    }
+                    await showResult(DOMAIN + '/' + (mergeRes.code || mergeRes.url.split('/').pop()), mergeRes.expire_at || 0);
+                } catch (err) {
+                    uploadAborted = true;
+                    if (!cancelNotified) {
+                        alert((err && err.error) || '合并失败');
+                    }
+                    resetUI();
+                }
+            }
+
+            uploadNext();
+        }
+
+        async function startR2DirectUpload(file, fileHash) {
+            const initResp = await fetch(`${API_BASE}/r2/upload/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file_name: file.name,
+                    file_size: file.size,
+                    hash: fileHash
+                })
+            });
+            const initRes = await initResp.json();
+            if (!initResp.ok) {
+                throw initRes;
+            }
+
+            const sessionId = initRes.session_id;
+            const chunkSize = initRes.chunk_size;
+            const totalParts = initRes.total_parts;
+            const parallel = initRes.parallel;
+            currentUploadId = sessionId;
+
+            const uploadStartedAt = Date.now();
+            let uploadedBytes = 0;
+            let uploading = new Set();
+            let activeChunkLoaded = new Map();
+            let nextPartNumber = 1;
+            let uploadAborted = false;
+            let completedParts = [];
+            let maxReportedBytes = 0;
+            let lastDisplayedProgress = 0;
+
+            function updateUploadMetrics() {
+                const inflightBytes = Array.from(activeChunkLoaded.values()).reduce((sum, value) => sum + value, 0);
+                const totalUploaded = Math.min(file.size, uploadedBytes + inflightBytes);
+                maxReportedBytes = Math.max(maxReportedBytes, totalUploaded);
+                const overallProgress = Math.min(99, Math.max(lastDisplayedProgress, Math.round((maxReportedBytes / file.size) * 100)));
+                lastDisplayedProgress = overallProgress;
+                progressBar.style.width = overallProgress + '%';
+                statusText.innerText = `正在上传: ${overallProgress}%`;
+
+                const elapsed = Math.max(0.001, (Date.now() - uploadStartedAt) / 1000);
+                const effectiveSpeed = (maxReportedBytes / (1024 * 1024) / elapsed).toFixed(2);
+                speedText.innerText = `${effectiveSpeed} MB/s`;
+            }
+
+            async function uploadPart(partNumber) {
+                const start = (partNumber - 1) * chunkSize;
+                const end = Math.min(file.size, start + chunkSize);
+                const chunk = file.slice(start, end);
+                activeChunkLoaded.set(partNumber, 0);
+                try {
+                    const signResp = await fetch(`${API_BASE}/r2/upload/sign-part`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            part_number: partNumber
+                        })
+                    });
+                    const signRes = await signResp.json();
+                    if (!signResp.ok) {
+                        throw signRes;
+                    }
+
+                    const putRes = await putWithProgress(signRes.url, chunk, (loaded) => {
+                        activeChunkLoaded.set(partNumber, loaded);
+                        updateUploadMetrics();
+                    });
+
+                    completedParts.push({
+                        part_number: partNumber,
+                        etag: (putRes.etag || '').replace(/^"+|"+$/g, '')
+                    });
+                    uploadedBytes += (end - start);
+                    updateUploadMetrics();
+                } finally {
+                    activeChunkLoaded.delete(partNumber);
+                    uploading.delete(partNumber);
+                    uploadNext();
+                }
+            }
+
+            function uploadNext() {
+                if (uploadAborted) return;
+
+                while (uploading.size < parallel && nextPartNumber <= totalParts) {
+                    const partNumber = nextPartNumber;
+                    uploading.add(partNumber);
+                    uploadPart(partNumber).catch((err) => {
+                        if (!uploadAborted) {
+                            uploadAborted = true;
+                            if (!cancelNotified) {
+                                alert((err && err.error) || '上传出错');
+                            }
+                            resetUI();
+                        }
+                    });
+                    nextPartNumber++;
+                }
+
+                if (uploading.size === 0 && nextPartNumber > totalParts && !uploadAborted) {
+                    doComplete();
+                }
+            }
+
+            async function doComplete() {
+                if (uploadAborted) return;
+                isMerging = true;
+                statusText.innerText = '正在打包链接...';
+                try {
+                    completedParts.sort((a, b) => a.part_number - b.part_number);
+                    const completeResp = await fetch(`${API_BASE}/r2/upload/complete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            parts: completedParts
+                        })
+                    });
+                    const completeRes = await completeResp.json();
+                    if (!completeResp.ok) {
+                        throw completeRes;
+                    }
+                    await showResult(DOMAIN + '/' + (completeRes.code || completeRes.url.split('/').pop()), completeRes.expire_at || 0);
+                } catch (err) {
+                    uploadAborted = true;
+                    if (!cancelNotified) {
+                        alert((err && err.error) || '合并失败');
+                    }
+                    resetUI();
+                }
+            }
+
+            uploadNext();
+        }
+
+        async function showResult(url, expireAt = 0) {
+            isUploading = false;
+            isMerging = false;
+            isCompleted = true;
+            cancelNotified = false;
+            currentUploadId = '';
+            currentShareUrl = url;
+            currentShareExpireAt = expireAt;
+            uploadingState.classList.add('hidden');
+            idleState.classList.remove('hidden');
+            resultArea.classList.remove('hidden');
+            shareLink.innerText = url;
+            renderQrCode(url);
+            try {
+                const stResp = await fetch(`${API_BASE}/storage`);
+                const stData = await stResp.json();
+                if (stData.available_gb !== undefined) {
+                    AVAILABLE_GB = stData.available_gb;
+                    updateStorageDisplay();
+                }
+            } catch (e) {}
+        }
+
+        function resetUI() {
+            isUploading = false;
+            isMerging = false;
+            isCompleted = false;
+            cancelNotified = false;
+            currentUploadId = '';
+            activeUploadMode = UPLOAD_MODE || 'local';
+            resultArea.classList.add('hidden');
+            uploadingState.classList.add('hidden');
+            idleState.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            statusText.innerText = '准备中...';
+            speedText.innerText = '0 MB/s';
+            fileInput.value = '';
+            currentShareUrl = '';
+            currentShareExpireAt = 0;
+            clearQrCode();
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText(shareLink.innerText);
+            const originalText = shareLink.innerText;
+            shareLink.innerText = '已成功复制到剪贴板';
+            shareLink.classList.replace('bg-slate-100', 'bg-green-100');
+            setTimeout(() => {
+                shareLink.innerText = originalText;
+                shareLink.classList.replace('bg-green-100', 'bg-slate-100');
+            }, 1500);
+        }
+
+        function copyLinkSilently(url) {
+            navigator.clipboard.writeText(url);
+            const originalText = shareLink.innerText;
+            shareLink.innerText = '链接已复制，可直接分享';
+            shareLink.classList.replace('bg-slate-100', 'bg-green-100');
+            setTimeout(() => {
+                shareLink.innerText = originalText;
+                shareLink.classList.replace('bg-green-100', 'bg-slate-100');
+            }, 1500);
+        }
+
+        function shouldUseNativeShare() {
+            return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        }
+
+        function clearQrCode() {
+            if (qrCodeContainer) qrCodeContainer.innerHTML = '';
+        }
+
+        function renderQrCode(url) {
+            clearQrCode();
+            if (!qrCodeContainer || !url) return;
+
+            if (typeof QRCode === 'undefined') {
+                qrCodeContainer.innerHTML = '<span class="text-[10px] text-slate-400">二维码不可用</span>';
+                return;
+            }
+
+            new QRCode(qrCodeContainer, {
+                text: url,
+                width: 96,
+                height: 96,
+                colorDark: '#0f172a',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+
+        function formatExpireAt(expireAt) {
+            if (!expireAt) return '未知';
+            const d = new Date(expireAt * 1000);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function buildShareMessage() {
+            const url = currentShareUrl || shareLink.innerText.trim();
+            const expireText = formatExpireAt(currentShareExpireAt);
+            return `${url}?s=在浏览器打开，分享文件失效时间：${expireText}`;
+        }
+
+        function copyShareMessage() {
+            const message = buildShareMessage();
+            copyLinkSilently(message);
+        }
+
+        async function shareResultLink() {
+            const message = buildShareMessage();
+            if (!message.trim()) return;
+
+            if (!shouldUseNativeShare() || !navigator.share) {
+                copyShareMessage();
+                return;
+            }
+
+            if (navigator.canShare && !navigator.canShare({ text: message })) {
+                copyShareMessage();
+                return;
+            }
+
+            try {
+                await navigator.share({
+                    title: document.title,
+                    text: message
+                });
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    return;
+                }
+                copyShareMessage();
+            }
+        }
+
+        dropZone.onclick = () => {
+            if (isUploading) return;
+            if (!resultArea.classList.contains('hidden')) resetUI();
+            fileInput.click();
+        };
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('active');
+        };
+
+        dropZone.ondragleave = () => dropZone.classList.remove('active');
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+            if (!resultArea.classList.contains('hidden')) resetUI();
+            handleFile(e.dataTransfer.files[0]);
+        };
+
+        fileInput.onchange = (e) => handleFile(e.target.files[0]);
+        window.addEventListener('pagehide', notifyCancelUpload);
+        window.addEventListener('beforeunload', notifyCancelUpload);
+        fetchConfig();
+    </script>
+</body>
+</html>

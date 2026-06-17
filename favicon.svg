@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Rocket icon">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#2563eb"/>
+  <g transform="translate(32 32) rotate(-18) translate(-32 -32)">
+    <path d="M32 10L41 22H23L32 10Z" fill="#ffffff"/>
+    <rect x="23" y="20" width="18" height="24" rx="9" fill="#ffffff"/>
+    <circle cx="32" cy="28" r="4.5" fill="#2563eb"/>
+    <path d="M23 35L16 41L23 41Z" fill="#93c5fd"/>
+    <path d="M41 35L48 41L41 41Z" fill="#93c5fd"/>
+    <path d="M27 44L32 55L37 44Z" fill="#fb923c"/>
+    <path d="M29.5 44L32 49L34.5 44Z" fill="#facc15"/>
+  </g>
+</svg>

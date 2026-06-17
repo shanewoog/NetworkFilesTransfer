@@ -1,0 +1,15 @@
+dist/
+uploads/
+temp/
+share.db
+share.db-*
+*.db
+*.db-shm
+*.db-wal
+config.json
+*.exe
+NetworkFilesTransfer.exe
+NetworkFilesTransfer
+nft
+.gocache/
+.gomodcache/

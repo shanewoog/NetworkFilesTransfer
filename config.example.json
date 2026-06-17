@@ -1,0 +1,24 @@
+{
+    "upload_mode": "local",
+    "port": "9000",
+    "domain": "http://127.0.0.1:9000",
+    "upload_dir": "./uploads",
+    "temp_dir": "./temp",
+    "db_path": "./share.db",
+    "expire_hours": 24,
+    "max_single_size_gb": 10,
+    "max_total_size_gb": 20,
+    "share_code_length": 6,
+    "download_limit": 5,
+    "retention_interval_min": 10,
+    "r2": {
+        "enabled": false,
+        "endpoint": "https://<account-id>.r2.cloudflarestorage.com",
+        "bucket": "<bucket-name>",
+        "access_key_id": "<access-key-id>",
+        "secret_access_key": "<secret-access-key>",
+        "region": "auto",
+        "prefix": "nft/",
+        "access_domain": "https://cdn.example.com"
+    }
+}
