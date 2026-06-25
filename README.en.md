@@ -30,6 +30,7 @@ It provides ready-to-use upload and download pages for temporary file sharing, L
 - Self-hosted lightweight file sharing
 - Small-team asset delivery
 - Private file handoff without relying on third-party file sharing products
+- Short-lived public file sharing between internet clients by deploying it on a public server, for example using a high-bandwidth low-cost [Rainyun server](https://www.rainyun.com/save10_)
 
 ## Tech Stack
 
