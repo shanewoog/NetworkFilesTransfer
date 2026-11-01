@@ -85,7 +85,12 @@ RELEASE_FILES=(
 
 usage() {
 cat <<EOF
-Usage: sudo ./nft.sh <command>
+Usage: sudo ./nft.sh [command]
+
+Without a command:
+install directory missing and service not running -> install
+install directory exists and service running -> update
+otherwise this help is printed
 
 Commands:
 install   Install to $DEFAULT_INSTALL_DIR (keeps existing config, does not start service)
@@ -361,7 +366,38 @@ echo "Config: $INSTALL_DIR/config.json"
 echo "Logs: journalctl -u $SERVICE_NAME -f"
 }
 
+is_service_active() {
+systemctl is-active --quiet "$SERVICE_NAME" >/dev/null 2>&1
+}
+
+auto_command() {
+if [ ! -d "$INSTALL_DIR" ] && ! is_service_active; then
+echo ">>> No install directory and service not running: install"
+cmd_install
+return
+fi
+
+if [ -d "$INSTALL_DIR" ] && is_service_active; then
+echo ">>> Install directory exists and service is running: update"
+cmd_update
+return
+fi
+
+if [ ! -d "$INSTALL_DIR" ]; then
+echo "Install directory not found: $INSTALL_DIR" >&2
+else
+echo "Install directory exists but service $SERVICE_NAME is not running." >&2
+echo "Start it with: systemctl start $SERVICE_NAME" >&2
+echo "Or reinstall with: sudo ./nft.sh install" >&2
+fi
+usage
+exit 1
+}
+
 case "${1:-}" in
+"")
+auto_command
+;;
 install)
 cmd_install
 ;;

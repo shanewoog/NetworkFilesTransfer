@@ -130,10 +130,11 @@ func main() {
 // 闂傚倸鍊搁崐鎼佸磹妞嬪海鐭嗗〒姘ｅ亾鐎规洏鍎抽埀顒婄秵閸犳牜澹曢崸妤佺厵闁诡垳澧楅ˉ澶愬箹閺夋埊韬柡灞诲€濋幊婵嬪箥椤旇偐澧┑鐐茬摠缁瞼绱炴繝鍥ц摕婵炴垯鍨瑰敮濡炪倖姊婚崢褔锝為鍫熲拺缂備焦蓱鐏忋劑鏌涚€ｎ偅宕岄柡宀嬬稻閹棃鏁嶉崟顓熸闂備胶顭堟绋跨暦椤掑倸寮查梻渚€娼ц墝闁哄懏鐩畷娆撴偐缂佹鍘遍悗鍏夊亾闁逞屽墴瀹曟垿鎮欓悜妯轰簵濠电偛妫欓幐濠氭偂濞嗘劑浜滈柟鎹愭硾閺嬪海绱掑Δ浣告诞闁哄本鐩顕€鍩€椤掆偓椤繈濡搁埡浣虹枀?
 func getConfig(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"domain":       globalCfg.Domain,
-		"expire_hours": globalCfg.ExpireHours,
-		"upload_mode":  effectiveUploadMode(),
-		"version":      appVersion,
+		"domain":             globalCfg.Domain,
+		"expire_hours":       globalCfg.ExpireHours,
+		"max_single_size_gb": globalCfg.MaxSingleSizeGB,
+		"upload_mode":        effectiveUploadMode(),
+		"version":            appVersion,
 	})
 }
 

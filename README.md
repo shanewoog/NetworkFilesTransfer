@@ -388,8 +388,10 @@ dist/nft.sh
 
 ```bash
 chmod +x nft.sh
-sudo ./nft.sh install
+sudo ./nft.sh
 ```
+
+不带参数时自动判断：安装目录不存在且服务未运行则执行 `install`；安装目录存在且服务正在运行则执行 `update`；其他情况打印用法。
 
 默认安装到 `/opt/nft`，服务名 `nft`。安装不会自动启动服务，先改配置再手动启动：
 

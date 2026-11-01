@@ -35,7 +35,7 @@ nft.sh
 
 ## 管理脚本 nft.sh
 
-`nft.sh` 提供四个子命令：
+`nft.sh` 提供四个子命令；不带子命令时会自动判断：安装目录不存在且服务未运行则执行 `install`，安装目录存在且服务正在运行则执行 `update`，其余情况打印用法并退出 1。
 
 | 命令 | 行为 |
 | --- | --- |
@@ -43,6 +43,7 @@ nft.sh
 | `update` | 停止服务 → 替换程序与静态文件 → 保留 `config.json`、`uploads/`、`temp/`、`share.db` 等运行数据 → 重写服务文件并启动 → 删除本次执行的 `nft.sh` |
 | `uninstall` | 停止并禁用服务，删除 systemd 服务文件，询问是否删除安装目录 |
 | `status` | 输出 `systemctl status` 与配置路径 |
+| 无参数 | 见上：自动 `install` / 自动 `update` / 打印用法 |
 
 默认值：
 

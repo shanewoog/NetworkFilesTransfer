@@ -1,4 +1,4 @@
-﻿# NFT Linux 操作文档
+﻿ NFT Linux 操作文档
 
 本文档用于 Linux 服务器上的安装、更新、卸载和常用服务管理。
 
@@ -19,8 +19,12 @@ chmod +x nft.sh
 3. 执行安装
 
 ```bash
-sudo ./nft.sh install
+sudo ./nft.sh
 ```
+
+不带参数时会自动判断：安装目录不存在且服务未运行则执行 `install`；安装目录存在且服务正在运行则执行 `update`；其他情况打印用法。
+
+也可以显式指定命令：`sudo ./nft.sh install`。
 
 默认行为:
 
