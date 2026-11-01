@@ -66,8 +66,7 @@
 ├── qrcode.min.js
 ├── config.json
 ├── buildLinux64.ps1
-├── install.sh
-├── uninstall.sh
+├── nft.sh
 ├── nft-linux-guide.md
 ├── version.txt
 ├── uploads/
@@ -375,49 +374,43 @@ go build -o NetworkFilesTransfer.exe .
 dist/
 ```
 
-典型发布文件包括：
+发布物只有一个文件：
 
-- `nft`
-- `config.json`
-- `index.html`
-- `download.html`
-- `app.css`
-- `qrcode.min.js`
-- `favicon.svg`
-- `install.sh`
-- `uninstall.sh`
-- `nft-linux-guide.md`
+```text
+dist/nft.sh
+```
+
+该脚本内嵌了 `nft`、`config.json`、页面文件和 `nft-linux-guide.md`，服务器上只需上传它。
 
 ## Linux 部署
 
-构建完成后，把 `dist/` 目录内容上传到 Linux 服务器，再执行：
+构建完成后，把 `dist/nft.sh` 上传到 Linux 服务器，再执行：
 
 ```bash
-chmod +x install.sh
-sudo ./install.sh
+chmod +x nft.sh
+sudo ./nft.sh install
+```
+
+默认安装到 `/opt/nft`，服务名 `nft`。安装不会自动启动服务，先改配置再手动启动：
+
+```bash
+sudo vi /opt/nft/config.json
+sudo systemctl start nft
 ```
 
 也可以指定安装目录：
 
 ```bash
-sudo INSTALL_DIR=/opt/nft ./install.sh
+sudo INSTALL_DIR=/data/nft ./nft.sh install
 ```
 
-安装完成后可使用：
+更新：把新版本 `nft.sh` 上传到任意目录后执行 `sudo ./nft.sh update`，会先停服务、保留配置和数据、替换程序后重启，并在完成后删除本次使用的 `nft.sh`。
+
+卸载与状态：
 
 ```bash
-systemctl start nft
-systemctl stop nft
-systemctl restart nft
-systemctl status nft
-journalctl -u nft -f
-```
-
-卸载：
-
-```bash
-chmod +x uninstall.sh
-sudo ./uninstall.sh
+sudo /opt/nft/nft.sh uninstall
+sudo /opt/nft/nft.sh status
 ```
 
 ## Cloudflare 代理配置（免费 HTTPS）
